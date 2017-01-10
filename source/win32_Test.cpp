@@ -1,11 +1,10 @@
 /*  ===================================================================
 	File: win32_Test.cpp
 	Date: 10 January 2017 (Tuesday)
-	Revision: 
+	Revision: 11 January 2017 (Wednesday)
 	
 	Author: Tony Persson
 	Contact: Nepra_84@msn.com
-	Notice: (C) Copyright 2017 by Tony Persson. All Rights Reserved.
 	===================================================================  */
 
 #include <windows.h>
@@ -17,7 +16,7 @@
 
 typedef uint8_t uint8;
 typedef uint16_t uint16;
-typedef uint32_t uint32;
+typedef uint32_t uint32; 
 typedef uint64_t uint64;
 
 typedef int8_t int8;
@@ -55,10 +54,10 @@ RenderWeirdGradient(int XOffset, int YOffset)
 			*Pixel = (uint8)(X + XOffset); 	//B
 			++Pixel;
 
-			*Pixel = (uint8)(Y + YOffset); 	//G
+			*Pixel = 0; 	//G
 			++Pixel;
 
-			*Pixel = 0;						//R		
+			*Pixel = (uint8)(Y + YOffset);						//R		
 			++Pixel;
 
 			*Pixel = 0;						//A
@@ -98,10 +97,10 @@ Win32ResizeDIBSection(int Width, int Height)
 } 
 
 internal void
-Win32UpdateWindow(HDC DeviceContext, RECT *WindowRect, int X, int Y, int Width, int Height)
+Win32UpdateWindow(HDC DeviceContext, RECT *ClientRect, int X, int Y, int Width, int Height)
 {
-	int WindowWidth = WindowRect->right - WindowRect->left;
-	int WindowHeight = WindowRect->bottom - WindowRect->top;
+	int WindowWidth = ClientRect->right - ClientRect->left;
+	int WindowHeight = ClientRect->bottom - ClientRect->top;
 
 	StretchDIBits(DeviceContext,
 				  /*
@@ -195,7 +194,7 @@ WinMain(HINSTANCE Instance,
 
 	if(RegisterClass(&WindowClass))
 	{
-		HWND WindowHandle = 
+		HWND Window = 
 					CreateWindowEx(	
 						0,
   						WindowClass.lpszClassName,
@@ -210,7 +209,7 @@ WinMain(HINSTANCE Instance,
   						Instance,
   						0);
 
-		if(WindowHandle)
+		if(Window)
 		{
 			Running = true;
 			while(Running)
