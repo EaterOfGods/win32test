@@ -1,0 +1,22 @@
+{
+	"folders":
+	[
+		{
+			"path": "source",
+			"name": "src",
+			"file_exclude_patterns": ["*.bat"]
+		},
+		{
+			"path": "data",
+			"name": "resources"
+		}
+	],
+	"build_systems":
+	[
+		{
+			"name": "Visual Studio Build",
+			"shell_cmd": "$project_path\\source\\build.bat"
+		}
+	]
+
+}
