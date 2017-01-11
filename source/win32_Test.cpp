@@ -26,12 +26,12 @@ typedef int64_t int64;
 
 struct win32_offscreen_buffer
 {
+	// NOTE(Tony): Pixels are always 32-bits wide, Memory order BB GG RR XX
 	BITMAPINFO Info;
 	void *Memory;
 	int Width;
  	int Height;
  	int Pitch;
- 	int BytesPerPixel;
 };
 
 struct win32_window_dimension
@@ -92,20 +92,23 @@ Win32ResizeDIBSection(win32_offscreen_buffer *Buffer, int Width, int Height)
 	Buffer->Width = Width;
 	Buffer->Height = Height;
 	// NOTE(Tony): Using padding for memory alignment.
-	Buffer->BytesPerPixel = 4;
+	int BytesPerPixel = 4;
 
+	// NOTE(Tony): When the biHeight field is negative, this is the clue to
+	// Windows to treat this bitmap as top-down, not bottom-up, meaning that
+	// the first three bytes of the image are the colors of the top left pixel
+	// in the bitmap, not the bottom left!
 	Buffer->Info.bmiHeader.biSize = sizeof(Buffer->Info.bmiHeader);
 	Buffer->Info.bmiHeader.biWidth = Buffer->Width;
-	// NOTE(Tony): Negative height for top->down.
 	Buffer->Info.bmiHeader.biHeight = -Buffer->Height; 
 	Buffer->Info.bmiHeader.biPlanes = 1;
 	Buffer->Info.bmiHeader.biBitCount = 32;
 	Buffer->Info.bmiHeader.biCompression = BI_RGB;
 
-	int BitmapMemorySize = (Width*Height)*Buffer->BytesPerPixel;
+	int BitmapMemorySize = (Width*Height)*BytesPerPixel;
 	Buffer->Memory = VirtualAlloc(0, BitmapMemorySize, MEM_COMMIT, PAGE_READWRITE);
 	
-	Buffer->Pitch = Width*Buffer->BytesPerPixel;
+	Buffer->Pitch = Width*BytesPerPixel;
 	
 	// TODO(Tony): Clear this to black?
 
@@ -115,7 +118,7 @@ internal void
 Win32DisplayBufferInWindow(HDC DeviceContext, 
 						   int WindowWidth, int WindowHeight, 
 						   win32_offscreen_buffer Buffer,
-						   int X, int Y, int Width, int Height)
+						   int X, int Y)
 {
 	StretchDIBits(DeviceContext,
 				  /*
@@ -175,7 +178,7 @@ Win32MainWindowCallback(HWND Window,
 			Win32DisplayBufferInWindow(DeviceContext,
 									   Dimension.Width, Dimension.Height,
 									   GlobalBackbuffer,
-									   X, Y, Width, Height);
+									   X, Y);
 			EndPaint(Window, &Paint);
 		} break;
 
@@ -200,7 +203,7 @@ WinMain(HINSTANCE Instance,
 
 	Win32ResizeDIBSection(&GlobalBackbuffer, 1280, 720);
 	
-	WindowClass.style = CS_HREDRAW|CS_VREDRAW;
+	WindowClass.style = CS_HREDRAW|CS_VREDRAW|CS_OWNDC;
 	WindowClass.lpfnWndProc = Win32MainWindowCallback;
 	WindowClass.hInstance = Instance;
 	WindowClass.lpszClassName = "TestWindowClass";
@@ -225,6 +228,8 @@ WinMain(HINSTANCE Instance,
 
 		if(Window)
 		{
+			HDC DeviceContext = GetDC(Window);
+
 			int XOffset = 0;
 			int YOffset = 0;
 
@@ -245,14 +250,11 @@ WinMain(HINSTANCE Instance,
 
 				RenderWeirdGradient(GlobalBackbuffer, XOffset, YOffset);
 
-				HDC DeviceContext = GetDC(Window);
 				win32_window_dimension Dimension = Win32GetWindowDimension(Window);
 				Win32DisplayBufferInWindow(DeviceContext,
 										   Dimension.Width, Dimension.Height,
 										   GlobalBackbuffer,
-										   0, 0, Dimension.Width, Dimension.Height);
-				ReleaseDC(Window, DeviceContext);
-
+										   0, 0);
 				++XOffset;
 				YOffset += 2;
 
