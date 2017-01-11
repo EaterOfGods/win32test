@@ -76,7 +76,7 @@ Win32LoadXInput(void)
 {
 	// IMPORTANT(Tony): Tries to load an older version of xinput, if it succeeds in doing so
 	// we use GetProcAddress to try and fetch the adresses of the functions we want to point to.
-	HMODULE XInputLibrary = LoadLibrary("xinput1_3.dll");
+	HMODULE XInputLibrary = LoadLibraryA("xinput1_3.dll");
 	if(XInputLibrary)
 	{
 		XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
@@ -98,17 +98,18 @@ Win32GetWindowDimension(HWND Window)
 }
 
 internal void
-RenderWeirdGradient(win32_offscreen_buffer Buffer, int BlueOffset, int GreenOffset)
+RenderWeirdGradient(win32_offscreen_buffer *Buffer,
+				    int BlueOffset, int GreenOffset)
 {
-	uint8 *Row = (uint8 *)Buffer.Memory;
+	uint8 *Row = (uint8 *)Buffer->Memory;
 	for(int Y = 0;
-		Y < Buffer.Height; 
+		Y < Buffer->Height; 
 		++Y)
 	{
 		uint32 *Pixel = (uint32 *)Row;
 
 		for(int X = 0; 
-			X < Buffer.Width; 
+			X < Buffer->Width; 
 			++X)
 		{
 			uint8 Blue = (X +  BlueOffset); 
@@ -117,7 +118,7 @@ RenderWeirdGradient(win32_offscreen_buffer Buffer, int BlueOffset, int GreenOffs
 			*Pixel++ = ((Green << 8) | Blue);
 		}
 
-		Row += Buffer.Pitch;
+		Row += Buffer->Pitch;
 	}
 }
 
@@ -154,10 +155,10 @@ Win32ResizeDIBSection(win32_offscreen_buffer *Buffer, int Width, int Height)
 
 } 
 
-internal void
-Win32DisplayBufferInWindow(HDC DeviceContext, 
+internal void						   
+Win32DisplayBufferInWindow(win32_offscreen_buffer *Buffer,
+						   HDC DeviceContext, 
 						   int WindowWidth, int WindowHeight, 
-						   win32_offscreen_buffer Buffer,
 						   int X, int Y)
 {
 	StretchDIBits(DeviceContext,
@@ -166,9 +167,9 @@ Win32DisplayBufferInWindow(HDC DeviceContext,
 				  X, Y, Width, Height,
 				  */
 				  0, 0, WindowWidth, WindowHeight,
-				  0, 0, Buffer.Width, Buffer.Height,
-				  Buffer.Memory,
-				  &Buffer.Info,
+				  0, 0, Buffer->Width, Buffer->Height,
+				  Buffer->Memory,
+				  &Buffer->Info,
 				  DIB_RGB_COLORS, SRCCOPY);
 }
 
@@ -277,9 +278,9 @@ Win32MainWindowCallback(HWND Window,
 			// TODO(Tony): fix this shit.	
 			win32_window_dimension Dimension = Win32GetWindowDimension(Window);
 
-			Win32DisplayBufferInWindow(DeviceContext,
+			Win32DisplayBufferInWindow(&GlobalBackbuffer,
+									   DeviceContext,
 									   Dimension.Width, Dimension.Height,
-									   GlobalBackbuffer,
 									   X, Y);
 			EndPaint(Window, &Paint);
 		} break;
@@ -302,7 +303,7 @@ WinMain(HINSTANCE Instance,
 {
 	Win32LoadXInput();
 	
-	WNDCLASS WindowClass = {};
+	WNDCLASSA WindowClass = {};
 
 	Win32ResizeDIBSection(&GlobalBackbuffer, 1280, 720);
 	
@@ -389,12 +390,12 @@ WinMain(HINSTANCE Instance,
 					}
 				}
 
-				RenderWeirdGradient(GlobalBackbuffer, XOffset, YOffset);
+				RenderWeirdGradient(&GlobalBackbuffer, XOffset, YOffset);
 
 				win32_window_dimension Dimension = Win32GetWindowDimension(Window);
-				Win32DisplayBufferInWindow(DeviceContext,
+				Win32DisplayBufferInWindow(&GlobalBackbuffer,
+										   DeviceContext,
 										   Dimension.Width, Dimension.Height,
-										   GlobalBackbuffer,
 										   0, 0);
 				++XOffset;
 				YOffset += 2;
