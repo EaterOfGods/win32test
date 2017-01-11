@@ -9,6 +9,7 @@
 
 #include <windows.h>
 #include <stdint.h>
+#include <xinput.h>
 
 #define global_variable static
 #define local_persist static
@@ -44,7 +45,46 @@ struct win32_window_dimension
 global_variable bool Running;
 global_variable win32_offscreen_buffer GlobalBackbuffer;
 
-win32_window_dimension
+// NOTE(Tony): The following parts is a workaround to allow us 
+// to use XInputGetState/XInputSetState without compiling with the library
+// and allowing us to try to load an older version.
+
+// NOTE(Tony): XInputGetState
+#define X_INPUT_GET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_STATE *pState)
+typedef X_INPUT_GET_STATE(x_input_get_state);
+X_INPUT_GET_STATE(XInputGetStateStub)
+{
+
+	return 0;
+
+}
+global_variable x_input_get_state *XInputGetState_ = XInputGetStateStub;
+#define XInputGetState XInputGetState_
+
+// NOTE(Tony): XInputSetState
+#define X_INPUT_SET_STATE(name) DWORD WINAPI name(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+typedef X_INPUT_SET_STATE(x_input_set_state);
+X_INPUT_SET_STATE(XInputSetStateStub)
+{
+	return 0;
+}
+global_variable x_input_set_state *XInputSetState_ = XInputSetStateStub;
+#define XInputSetState XInputSetState_
+
+internal void
+Win32LoadXInput(void)
+{
+	// IMPORTANT(Tony): Tries to load an older version of xinput, if it succeeds in doing so
+	// we use GetProcAddress to try and fetch the adresses of the functions we want to point to.
+	HMODULE XInputLibrary = LoadLibrary("xinput1_3.dll");
+	if(XInputLibrary)
+	{
+		XInputGetState = (x_input_get_state *)GetProcAddress(XInputLibrary, "XInputGetState");
+		XInputSetState = (x_input_set_state *)GetProcAddress(XInputLibrary, "XInputSetState");
+	}
+}
+
+internal win32_window_dimension
 Win32GetWindowDimension(HWND Window)
 {
 	win32_window_dimension Result;
@@ -132,7 +172,7 @@ Win32DisplayBufferInWindow(HDC DeviceContext,
 				  DIB_RGB_COLORS, SRCCOPY);
 }
 
-LRESULT CALLBACK
+internal LRESULT CALLBACK
 Win32MainWindowCallback(HWND Window,
 				   UINT Message,
 				   WPARAM WParam,
@@ -150,6 +190,68 @@ Win32MainWindowCallback(HWND Window,
 		{
 			// TODO(Tony): Handle this as an error, recreate window.
 			Running = false;
+		} break;
+
+		case WM_SYSKEYDOWN:
+		case WM_SYSKEYUP:
+		case WM_KEYDOWN:
+		case WM_KEYUP:
+		{
+			uint32 VKCode = WParam;
+			bool WasDown = ((LParam & (1 << 30)) != 0);
+			bool IsDown = ((LParam & (1 << 31)) == 0);
+
+			if(WasDown != IsDown)
+			{
+				if(VKCode == 'W')
+				{
+					OutputDebugStringA("W\n");
+				}
+				else if(VKCode == 'A')
+				{
+				}
+				else if(VKCode == 'S')
+				{
+				}
+				else if(VKCode == 'D')
+				{
+				}
+				else if(VKCode == 'Q')
+				{
+				}
+				else if(VKCode == 'E')
+				{
+				}
+				else if(VKCode == VK_UP)
+				{
+				}
+				else if(VKCode == VK_DOWN)
+				{
+				}
+				else if(VKCode == VK_LEFT)
+				{
+				}
+				else if(VKCode == VK_RIGHT)
+				{
+				}
+				else if(VKCode == VK_ESCAPE)
+				{
+					OutputDebugStringA("ESCAPE: ");
+					if(IsDown)
+					{
+						OutputDebugStringA("IsDown");
+					}
+					if(WasDown)
+					{
+						OutputDebugStringA("WasDown");
+					}
+					OutputDebugStringA("\n");
+				}
+				else if(VKCode == VK_SPACE)
+				{
+				}
+		    }
+
 		} break;
 
 		case WM_CLOSE:
@@ -198,6 +300,7 @@ WinMain(HINSTANCE Instance,
 		LPSTR CommandLine,
 		int ShowCode)
 {
+	Win32LoadXInput();
 	
 	WNDCLASS WindowClass = {};
 
@@ -246,6 +349,44 @@ WinMain(HINSTANCE Instance,
 
 					TranslateMessage(&Message);
 					DispatchMessage(&Message);
+				}
+
+				for(DWORD ControllerIndex = 0;
+				    ControllerIndex < XUSER_MAX_COUNT;
+				    ++ControllerIndex)
+				{
+					XINPUT_STATE ControllerState;
+					if(XInputGetState(ControllerIndex, &ControllerState) == ERROR_SUCCESS)
+					{
+						// NOTE(Tony): This controller is plugged in.
+						XINPUT_GAMEPAD *Pad = &ControllerState.Gamepad;
+
+						bool Up = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_UP);
+						bool Down = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_DOWN);
+						bool Left = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_LEFT);
+						bool Right = (Pad->wButtons & XINPUT_GAMEPAD_DPAD_RIGHT);
+						bool Start = (Pad->wButtons & XINPUT_GAMEPAD_START);
+						bool Back = (Pad->wButtons & XINPUT_GAMEPAD_BACK);
+						bool LeftShoulder = (Pad->wButtons & XINPUT_GAMEPAD_LEFT_SHOULDER);
+						bool RightShoulder = (Pad->wButtons & XINPUT_GAMEPAD_RIGHT_SHOULDER);
+						bool AButton = (Pad->wButtons & XINPUT_GAMEPAD_A);
+						bool BButton = (Pad->wButtons & XINPUT_GAMEPAD_B);
+						bool XButton = (Pad->wButtons & XINPUT_GAMEPAD_X);
+						bool YButton = (Pad->wButtons & XINPUT_GAMEPAD_Y);
+
+						// NOTE(Tony): Left thumbstick.
+						int16 StickX = Pad->sThumbLX;
+						int16 StickY = Pad->sThumbLY;
+
+						if(AButton)
+						{
+
+						}
+					}
+					else
+					{
+						// NOTE(Tony): This controller not available.
+					}
 				}
 
 				RenderWeirdGradient(GlobalBackbuffer, XOffset, YOffset);
